@@ -1,2 +1,5 @@
 # palermo
-A python library that contains helper functions for delta lake / pyspark
+
+palermo provides a helper method to make it easier to approach som common delta lakehousing problems
+
+![palermo](https://github.com/eirikmag/palermo/blob/main/images/palermo.jfif)
