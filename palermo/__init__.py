@@ -3,7 +3,7 @@ from pyspark.sql.functions import col
 
 
 
-def pal_mergo (destination_table, source_view, primarykey_columns) :
+def pal_mergo (destination_table, source_view, primarykey_columns, watermark_column) :
     """
     Function for incrementally writing to a delta table from a pre-defined source spark view
 
