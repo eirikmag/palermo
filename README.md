@@ -1,26 +1,36 @@
-# palermo
+# Palermo
 
-palermo provides a helper method to make it easier to approach handling creation of spark delta tables and upserts to said tables.
+Palermo provides a helper method to make it easier to approach handling creation of spark delta tables and upserts to said tables.
 
 ![palermo](https://github.com/eirikmag/palermo/blob/main/images/palermo.jfif)
 
 
 ## Palermo merge
 
-The `pal_mergo` function handles the creation of a a spark table and the upserts to said table based in a very general way and with only one function. 
-The functions purpose is partially to force consistancy in how to handle Notebook-based data pipelines.
+The `pal_mergo` function handles the creation of a a spark table and the upserts to said table based on very few inputs. The solution is very general and only handles managed tables.
+The functions purpose is partially to force consistancy in how to handle Notebook-based data pipelines. It could be used as a helper method as part of a framework.
+
+The function has only been tested in Azure Synapse Notebooks using Apache Spark version 3.3.
+
+### Function parameters:
+
+* source_view: a string representing the name of the pre-defined Spark view containing the data to be written to the Delta table.
+* primarykey_columns: a string representing the primary key column(s) to be used as join clauses for merge, e.g. 'RegionID, RowID'.
+* watermark_column: a string representing the column to be used as a watermark to identify the new data to be merged with the existing Delta table.
+* destination_table: a string representing the name of the Delta table to be created or updated. 
+
+### Function returns:
+
+* return_message: a string message describing the action performed by the function, i.e. whether a new Delta table has been created or existing Delta table has been updated.
 
 
-```
+### The function works as follows:
 
-source_view: a spark view that defines the table you want to create. Must be deployed to spark prior to call of palermo merge.
-primarykey_columns: defines one or several columns that defines the row-level uniqueness of the table.
-watermark_column: your view MUST have a column that represents updated fields in a sortable manner.
-destination_table: the name of the output table 
+- It first tries to get the 'MAX' value of the watermark column from the destination Delta table using an SQL query.
+- If there is no watermark (i.e. the query returns None), the function writes the data from the source view to the Delta table using the 'overwrite' mode.
+- If there is a watermark, the function filters the new data from the source view based on the watermark column and joins it with the existing Delta table using the primary key column(s) to merge the data. 
+- It then updates the existing Delta table with the new data and inserts the rows that do not already exist in the Delta table.
 
-
-```
-
-## Example of use
+### Example of use:
 
 ![palermo](https://github.com/eirikmag/palermo/blob/main/images/notebook_example.jpg)
