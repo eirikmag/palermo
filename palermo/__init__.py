@@ -24,6 +24,7 @@ def pal_mergo (source_view, primarykey_columns, watermark_column, destination_ta
     
     # If there is no watermark. There is no supported table, so we (over)write one with data from source.
     except:
+        max_watermark = None
         dfupdates = spark.read.table(source_view)
         dfupdates.write.format("delta") \
             .mode("overwrite") \
