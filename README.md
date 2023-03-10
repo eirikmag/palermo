@@ -17,7 +17,11 @@ The function has only been tested in Azure Synapse Notebooks using Apache Spark 
 * source_view: a string representing the name of the pre-defined Spark view containing the data to be written to the Delta table.
 * primarykey_columns: a string representing the primary key column(s) to be used as join clauses for merge, e.g. 'RegionID, RowID'.
 * watermark_column: a string representing the column to be used as a watermark to identify the new data to be merged with the existing Delta table.
-* destination_table: a string representing the name of the Delta table to be created or updated. 
+* destination_table: a string representing the name of the desired Delta table. 
+* destination_location: a string representing the storage location of the desired Delta table.
+* merge_schema (optional): boolean setting for the Delta mergeSchema option. Defaults to True.
+* optimize_write (optional): boolean setting for the Delta autoOptimize.optimizeWrite option. Defaults to True.
+* auto_compact (optional): boolean setting for the Delta autoOptimize.autoCompac option. Defaults to True.
 
 ### Function returns:
 

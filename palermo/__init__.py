@@ -9,7 +9,7 @@ def pal_mergo (
         primarykey_columns: str,
         watermark_column: str,
         destination_table: str,
-        destination_location: str,
+        destination_location: str = None,
         merge_schema: bool = True,
         optimize_write: bool = True,
         auto_compact: bool = True,
@@ -25,7 +25,7 @@ def pal_mergo (
     string: generated join clause for use in a Spark MERGE operation
     """
     # Simple parameter validation to check if all inputs have value
-    if not all(isinstance(p, str) and len(p) > 0 for p in [source_view, primarykey_columns, watermark_column, destination_table]):
+    if not all(isinstance(p, str) and len(p) > 0 for p in [source_view, primarykey_columns, watermark_column, destination_table, destination_location]):
         raise ValueError("All parameters must be non-empty strings")
 
 
@@ -37,13 +37,14 @@ def pal_mergo (
     except AnalysisException:
         max_watermark = None
         dfupdates = spark.read.table(source_view)
-        dfupdates.write.format("delta") \
+        writer = dfupdates.write.format("delta") \
             .mode("overwrite") \
             .option("mergeSchema", merge_schema) \
             .option("delta.autoOptimize.optimizeWrite", optimize_write) \
-            .option("delta.autoOptimize.autoCompact", auto_compact) \
-            .option("path", destination_location) \
-            .saveAsTable(destination_table)
+            .option("delta.autoOptimize.autoCompact", auto_compact) 
+        if destination_location is not None:
+            writer = writer.option("path", destination_location)
+            writer.saveAsTable(destination_table)
         return_message = f"Creating new Delta table: '{destination_table}' from: '{source_view}'"
     except:
         return_message = f"Something went wrong trying to retrieve the maximum of {watermark_column} from {destination_table}"
