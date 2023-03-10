@@ -1,6 +1,6 @@
 # Palermo
 
-Palermo provides a helper method to make it easier to approach handling creation of spark delta tables and upserts to said tables.
+Palermo provides a helper method to make it easier to approach creation of and upserts to spark delta tables.
 
 ![palermo](https://github.com/eirikmag/palermo/blob/main/images/palermo.jfif)
 
