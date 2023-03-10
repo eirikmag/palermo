@@ -2,7 +2,12 @@ from delta.tables import *
 from pyspark.sql.functions import col
 
 
-def pal_mergo (source_view, primarykey_columns, watermark_column, destination_table) -> None:
+def pal_mergo (
+        source_view: str,
+        primarykey_columns: str,
+        watermark_column: str,
+        destination_table: str
+) -> None:
     """
     Function for incrementally writing to a delta table from a pre-defined source spark view. Does not depend on table being created previously
 
