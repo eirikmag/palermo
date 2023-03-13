@@ -64,7 +64,8 @@ pal_mergo(
     source_view = "silver.fact_transaction_pm",
     primarykey_columns =  "transactionid",
     watermark_column = "modifieddate",
-    destination_table = "gold.fact_transaction"
+    destination_table = "gold.fact_transaction",
+    merge_schema = False
     )
 ```
 
