@@ -36,5 +36,36 @@ The function has only been tested in Azure Synapse Notebooks using Apache Spark 
 - It then updates the existing Delta table with the new data and inserts the rows that do not already exist in the Delta table.
 
 ### Example of use:
+In a notebook context, a typical use case would involve you defining a Spark view in one cell:
 
-![palermo](https://github.com/eirikmag/palermo/blob/main/images/notebook_example.jpg)
+
+```sql
+%sql
+
+CREATE OR REPLACE VIEW silver.fact_transaction_pm
+AS 
+
+SELECT
+    t.transactionid
+    ,t.transactiondate
+    ,t.transactiontype
+    ,t.transactionamount
+    ,t.modifieddate
+    ,p.regionid
+FROM bronze.alltransactions t
+LEFT JOIN bronze.person p ON t.personid = p.personid
+```
+
+In the next cell you should trigger the function:
+```python
+%pyspark 
+
+pal_mergo(
+    source_view = "silver.fact_transaction_pm",
+    primarykey_columns =  "transactionid",
+    watermark_column = "modifieddate",
+    destination_table = "gold.fact_transaction"
+    )
+```
+
+After which you should be able to add a trigger of the notebook.
