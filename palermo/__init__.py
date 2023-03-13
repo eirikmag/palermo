@@ -18,11 +18,22 @@ def pal_mergo (
     Function for incrementally writing to a delta table from a pre-defined source spark view. Does not depend on table being created previously
 
     Parameters:
-    destination_table: name of the Spark Delta Lake table to create or upsert to.
-    primarykey_columns: string with (list of) primary key column(s) to be used as join clauses for merge (e.g. 'RegionID, RowID')
+        source_view (str): The name of the Spark view to be used as a source.
+        primarykey_columns (str): The primary key column(s) to be used as join clauses for merge (e.g. 'RegionID, RowID').
+        watermark_column (str): The column used to determine which records to update.
+        destination_table (str): The name of the Spark Delta Lake table to create or upsert to.
+        destination_location (str, optional): The storage location of the Delta Lake table.
+        merge_schema (bool, optional): A boolean value to indicate whether to merge schemas.
+        optimize_write (bool, optional): A boolean value to indicate whether to optimize write.
+        auto_compact (bool, optional): A boolean value to indicate whether to auto-compact.
 
     Returns:
-    string: generated join clause for use in a Spark MERGE operation
+        None: This function returns None.
+
+    Raises:
+        ValueError: Raises ValueError if any of the input parameters are empty or not of type str.
+        AnalysisException: If the maximum watermark is not found in the Delta table, a new table is created with the data from the source view.
+
     """
     # Simple parameter validation to check if all inputs have value
     if not all(isinstance(p, str) and len(p) > 0 for p in [source_view, primarykey_columns, watermark_column, destination_table, destination_location]):
