@@ -70,3 +70,61 @@ pal_mergo(
 ```
 
 After which you should be able to add a trigger of the notebook.
+
+
+## Destination Location Generator
+
+The  `destination_location_generator` generates a full storage path in the format of "abfss://medallion@storageaccounturi.dfs.core.windows.net/table_type/table_type_destination_table_name". 
+The purpose is to use this for generation of consistant file paths for delta tables in the case of not using managed tables. Currently the function has been built for use in Synapse notebooks and it also only supports azure storage acounts gen 2. 
+
+### Function parameters:
+* storageaccounturi: The URI of the azure storage account where we want to store our delta table.
+* destination_medallion: a string defining the medallion of the tables (https://docs.databricks.com/lakehouse/medallion.html).
+* destination_table_type: a string defining the table type of a table (e.g. 'fact' or 'dim').
+* destination_table_name: a string defining the table name (transaction).
+
+### Function returns:
+* destination_location: a string that can be used for registering the location path a new spark table. e.g. "".
+
+
+### Example of use:
+The following use:
+```python
+%pyspark 
+
+destination_location_generator(
+    accounturi = "altrohotboys"
+    destination_medallion = "gold",
+    destination_table_type =  "fact",
+    destination_table_name = "transaction"
+    )
+```
+will return:
+```python
+-->'abfss://gold@altrohotboys.dfs.core.windows.net/fact/fact_transaction/'
+```
+
+## Destination Table Generator
+The `destination_table_generator` generates the destination table name for a given medallion and table name, all in lower case and in a consistent format. The purpose is to use this for the generation of a consistent naming convention for destination tables.
+
+### Function parameters:
+* destination_medallion (str): The name of the medallion where the destination table is located.
+* destination_table_type (str): The type of the destination table (e.g. delta, parquet, etc.).
+* destination_table_name (str): The name of the destination table.
+
+### Function returns:
+destination_table_name (str): The destination table name in the format "medallion.table_type_table_name".
+
+### Example of use:
+The following use:
+```python
+destination_table_generator(
+    destination_medallion = "gold",
+    destination_table_type =  "fact",
+    destination_table_name = "transaction"
+    )
+```
+will return:
+```python
+-->'gold.fact_transaction'
+```

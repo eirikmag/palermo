@@ -19,7 +19,7 @@ def pal_mergo (
 
     Parameters:
         source_view (str): The name of the Spark view to be used as a source.
-        primarykey_columns (str): The primary key column(s) to be used as join clauses for merge (e.g. 'RegionID, RowID').
+        primarykey_columns (str): The primary key column(s) to be used as join clauses for merge (e.g. "RegionID, RowID").
         watermark_column (str): The column used to determine which records to update.
         destination_table (str): The name of the Spark Delta Lake table to create or upsert to.
         destination_location (str, optional): The storage location of the Delta Lake table.
@@ -67,7 +67,7 @@ def pal_mergo (
         dfupdates = spark.read.table(source_view).filter(col(watermark_column) >= max_watermark)
 
         #gen join_clause
-        pk_columns = [col.strip() for col in primarykey_columns.split(',')] if primarykey_columns else None
+        pk_columns = [col.strip() for col in primarykey_columns.split(",")] if primarykey_columns else None
         join_clause = " AND ".join([f"destination.{col} = updates.{col}" for col in pk_columns]) if pk_columns else None
 
         dfdestination = DeltaTable.forName(spark, destination_table)
@@ -78,3 +78,57 @@ def pal_mergo (
             .execute()
         return_message = f"Merged data from '{source_view}' into Delta table: '{destination_table}'"
     return(return_message)
+
+
+def destination_location_generator(
+        storageaccounturi: str,
+        destination_medallion: str,
+        destination_table_type: str,
+        destination_table_name: str,
+        storage_type: str = "azure"
+        ) -> str:
+    """
+    Generates the storage location for a given medallion and table name in Azure Data Lake Storage Gen2 or other similar services.
+
+    Parameters:
+    storageaccounturi (str): The URI of the storage account where the destination location is located.
+    destination_medallion (str): The name of the medallion where the destination location is located.
+    destination_table_type (str): The type of the destination table (e.g. delta, parquet, etc.).
+    destination_table_name (str): The name of the destination table.
+    storage_type (str): The type of the storage service, defaults to "azure".
+
+    Returns:
+    str: The destination location string in the format "abfss://{medallion}@{storage_account}.dfs.core.windows.net/{table_type}/{table_name}/".
+    """
+
+    if storage_type == "azure":
+        # Generate the destination location string for Azure Data Lake Storage Gen2
+        destination_location = f"abfss://{destination_medallion}@{storageaccounturi}.dfs.core.windows.net/{destination_table_type}/{destination_table_type}_{destination_table_name}/".lower()
+
+    # Return the destination location string
+    return destination_location
+
+
+
+def destination_table_generator(
+        destination_medallion: str,
+        destination_table_type: str,
+        destination_table_name: str
+        ) -> str :
+    """
+    Generates the destination table name for a given medallion and table name all in lower case and in a consistant format.
+
+    Parameters:
+    destination_medallion (str): The name of the medallion where the destination table is located.
+    destination_table_type (str): The type of the destination table (e.g. delta, parquet, etc.).
+    destination_table_name (str): The name of the destination table.
+
+    Returns:
+    str: The destination table name in the format "{medallion}_lake.{table_type}_{table_name}".
+    """
+
+    # Generate the destination table name
+    destination_table_name = f"{destination_medallion}.{destination_table_type}_{destination_table_name}".lower()
+
+    # Return the destination table name
+    return destination_table_name
