@@ -132,3 +132,42 @@ def destination_table_generator(
 
     # Return the destination table name
     return destination_table_name
+
+
+def hoover(
+    spark_db: str,
+    retention_hours: int
+    ) -> None :
+    """
+    Vacuums all delta tables in a Spark database using the VACUUM command.
+
+    Parameters:
+        spark_db (str): The name of the Spark database to vacuum tables in.
+        vacuum_retention (int): The retention period to use when vacuuming tables, in hours. 
+            Must be a string representation of an integer.
+
+    Raises:
+        ValueError: If the `retention_hours` parameter is less than 168.
+
+    Returns:
+        None.
+    """
+    if vacuum_retention < 168:
+        raise ValueError("The vacuum_retention parameter must be at least 168 hours (1 week)")
+
+    # switch to the specified database
+    spark.catalog.setCurrentDatabase(spark_db)
+
+    # list all tables in the database
+    tables = spark.catalog.listTables()
+
+    # iterate through the tables and vacuum each one
+    for table in tables:
+        table_name = table.name
+        print(f"Vacuuming table '{spark_db}.{table_name}'...")
+        try:
+            spark.sql(f"VACUUM {spark_db}.{table_name} RETAIN {retention_hours} HOURS")
+        except:
+            print(f"-- Failed. '{spark_db}.{table_name}'. Table is probably not a delta table.")
+            # Ignore tables that are not Delta tables
+            pass

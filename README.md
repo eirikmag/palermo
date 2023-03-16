@@ -118,6 +118,8 @@ destination_table_name (str): The destination table name in the format "medallio
 ### Example of use:
 The following use:
 ```python
+%pyspark
+
 destination_table_generator(
     destination_medallion = "gold",
     destination_table_type =  "fact",
@@ -128,3 +130,25 @@ will return:
 ```python
 -->'gold.fact_transaction'
 ```
+
+## Hoover
+The `hoover` vacuums all delta tables in a Spark database using the VACUUM command. It only works for Delta tables.
+
+### Function parameters:
+* spark_db (str): The name of the Spark database to vacuum tables in.
+* retention_hours (int): The retention period to use when vacuuming tables, in hours. Must be an integer greater than or equal to 168.
+
+### Function returns:
+* None
+
+### Example of use:
+The following use:
+```python
+%pyspark
+
+hoover(
+    spark_db = "my_database",
+    retention_hours = 168
+    )
+```
+Will vacuum all Delta tables in the "my_database" Spark database with a retention period of 168 hours. If a table is not a Delta table, it will be skipped and a message will be printed to the console. If the retention period provided is less than 168 hours, a ValueError will be raised.
