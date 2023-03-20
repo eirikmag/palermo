@@ -152,22 +152,16 @@ def hoover(
     Returns:
         None.
     """
-    if vacuum_retention < 168:
-        raise ValueError("The vacuum_retention parameter must be at least 168 hours (1 week)")
 
-    # switch to the specified database
-    spark.catalog.setCurrentDatabase(spark_db)
+    if retention_hours < 168:
+        raise ValueError("The retention_hours parameter must be at least 168 hours (1 week)")
 
-    # list all tables in the database
-    tables = spark.catalog.listTables()
+    # List all tables in the database.
+    tables = spark.catalog.listTables(spark_db)
 
-    # iterate through the tables and vacuum each one
+    # Iterate through the tables and vacuum each one.
     for table in tables:
-        table_name = table.name
-        print(f"Vacuuming table '{spark_db}.{table_name}'...")
-        try:
-            spark.sql(f"VACUUM {spark_db}.{table_name} RETAIN {retention_hours} HOURS")
-        except:
-            print(f"-- Failed. '{spark_db}.{table_name}'. Table is probably not a delta table.")
-            # Ignore tables that are not Delta tables
-            pass
+        if table.tableType != "VIEW": # Exclude views from list to Vacuum
+            print(f"Vacuuming table '{table.database}.{table.name}'...")
+            deltaTable = DeltaTable.forName(spark, f"{table.database}.{table.name}")
+            deltaTable.vacuum(retentionHours = retention_hours)

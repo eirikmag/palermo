@@ -151,4 +151,5 @@ hoover(
     retention_hours = 168
     )
 ```
+
 Will vacuum all Delta tables in the "my_database" Spark database with a retention period of 168 hours. If a table is not a Delta table, it will be skipped and a message will be printed to the console. If the retention period provided is less than 168 hours, a ValueError will be raised.
