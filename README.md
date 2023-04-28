@@ -1,6 +1,6 @@
 # Palermo
 
-Palermo provides a helper method to make it easier to approach creation of and upserts to spark delta tables.
+Palermo provides helper methods meant for use in a development framework of Delta lakehouses in Azure Synapse Notebooks. The functions are built with as few dependencies as possible to allow for copy/paste-portability.
 
 ![palermo](https://github.com/eirikmag/palermo/blob/main/images/palermo.jfif)
 
