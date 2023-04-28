@@ -12,7 +12,9 @@ def pal_mergo (
         destination_location: str = None,
         merge_schema: bool = True,
         optimize_write: bool = True,
-        auto_compact: bool = True,
+        auto_compact: bool = True,        
+        partition_by: str = None,
+        change_data_feed: bool = False
 ) -> None:
     """
     Function for incrementally writing to a delta table from a pre-defined source spark view. Does not depend on table being created previously
@@ -23,9 +25,11 @@ def pal_mergo (
         watermark_column (str): The column used to determine which records to update.
         destination_table (str): The name of the Spark Delta Lake table to create or upsert to.
         destination_location (str, optional): The storage location of the Delta Lake table.
-        merge_schema (bool, optional): A boolean value to indicate whether to merge schemas.
-        optimize_write (bool, optional): A boolean value to indicate whether to optimize write.
-        auto_compact (bool, optional): A boolean value to indicate whether to auto-compact.
+        merge_schema (bool, optional): A boolean value to set merge schema to true/false.
+        optimize_write (bool, optional): A boolean value to set optimize write to true/false.
+        auto_compact (bool, optional): A boolean value to set auto-compact to true/false.
+        partition_by (string, optional): A string value to specify on which columns to partition delta tables.
+        change_data_feed (bool, optional): A boolean value to set auto-compact to true/false.
 
     Returns:
         None: This function returns None.
@@ -52,10 +56,13 @@ def pal_mergo (
             .mode("overwrite") \
             .option("mergeSchema", merge_schema) \
             .option("delta.autoOptimize.optimizeWrite", optimize_write) \
-            .option("delta.autoOptimize.autoCompact", auto_compact) 
+            .option("delta.autoOptimize.autoCompact", auto_compact) \
+            .option("delta.enableChangeDataFeed", change_data_feed)
         if destination_location is not None:
             writer = writer.option("path", destination_location)
-            writer.saveAsTable(destination_table)
+        if partition_by is not None:
+            writer = writer.partitionBy(partition_by)
+        writer.saveAsTable(destination_table)
         return_message = f"Creating new Delta table: '{destination_table}' from: '{source_view}'"
     except:
         return_message = f"Something went wrong trying to retrieve the maximum of {watermark_column} from {destination_table}"
