@@ -22,7 +22,7 @@ The function has only been tested in Azure Synapse Notebooks using Apache Spark 
 * merge_schema (optional): boolean setting for the Delta mergeSchema option. Defaults to True.
 * optimize_write (optional): boolean setting for the Delta autoOptimize.optimizeWrite option. Defaults to True.
 * auto_compact (optional): boolean setting for the Delta autoOptimize.autoCompact option. Defaults to True.
-* change_data_feed (optional): boolean setting for the Delta autoOptimize.enableChangeDataFeed option. Defaults to False.
+* change_data_feed (optional): boolean setting for the Delta delta.enableChangeDataFeed option. Defaults to False.
 * partition_by: (optional): a string representation of the column(s) you want to partition your delta table by.
 
 ### Function returns:
