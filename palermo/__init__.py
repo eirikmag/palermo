@@ -87,6 +87,7 @@ def pal_mergo (
     return(return_message)
 
 
+
 def destination_location_generator(
         storageaccounturi: str,
         destination_medallion: str,
@@ -141,6 +142,7 @@ def destination_table_generator(
     return destination_table_name
 
 
+
 def hoover(
     spark_db: str,
     retention_hours: int
@@ -172,3 +174,90 @@ def hoover(
             print(f"Vacuuming table '{table.database}.{table.name}'...")
             deltaTable = DeltaTable.forName(spark, f"{table.database}.{table.name}")
             deltaTable.vacuum(retentionHours = retention_hours)
+
+
+
+def dimwit (
+        source_view: str, 
+        unique_keys: str, 
+        order_keys_by:str, 
+        surrogate_key: str, 
+        destination: str, 
+        location: str
+) -> None:
+    """
+    dimwit writes or updates a Delta table from a registered view and ensures persistance of surrogate keys over time.
+
+    Parameters:
+        source_view (str): The name of the table name to write to.
+        unique_keys (str): The name of columns in source_view that should identify uniqueness.
+        order_keys_by (str): The name of a column to sort to get to produce row_numbers.
+        surrogate_key: (str): The name of the surrogate key to generate
+        destination: (str): The destination/catalog+table name to store the table as. eg. gold.dim_potato
+        location: (str): The "physical storage location" to store the table.
+
+    Returns:
+        None: This function returns None.
+    """
+
+    # Get column names and data types from delta table description of input view
+    table_description = spark.sql(f"DESCRIBE {source_view}")
+
+    # Extract column names and types as lists
+    col_names, data_types = table_description.selectExpr("collect_list(col_name)", "collect_list(data_type)").first()
+
+    try:
+        max_id = spark.sql(f"SELECT MAX({surrogate_key}) FROM {destination}").first()[0]
+        if max_id is None:
+            max_id = 0
+    # If there is no ID. There is no supported table, so we generate one dynamically based on input arguments.
+    except AnalysisException:
+        # Set incremental_id to begin building keys on
+        max_id = 0
+        # construct CREATE TABLE statement dynamically based on input view.
+        columns = " ,".join([f"{name} {data_type}" for name, data_type in zip(col_names, data_types)])
+        initial_table_definition = f'''
+          CREATE OR REPLACE TABLE {destination} 
+          ({surrogate_key} BIGINT not null, {columns})
+          USING DELTA
+          LOCATION "{location}"
+          '''
+        spark.sql(initial_table_definition)
+
+    # Create a filter condition that excludes rows where any unique key is null
+    unique_cols = [col.strip() for col in unique_keys.split(",")] if unique_keys else None
+    filter_condition = col(unique_cols[0]).isNotNull()
+    for col_name in unique_cols[1:]:
+        filter_condition &= col(col_name).isNotNull()
+
+    # Read data from source view and filter by unique key
+    df_updates = spark.read.table(source_view).filter(filter_condition)
+
+    # Read data from destination table
+    df_destination = spark.read.table(destination)
+
+    # Join destination table and updates table on unique key and get full dimension set in memory
+    df_updates = df_destination.alias("destination").join(
+        other=df_updates.alias("updates"),
+        on=[col("destination." + col_name) == col("updates." + col_name) for col_name in unique_cols],
+        how='full_outer'
+    ).selectExpr(f"destination.{surrogate_key} as {surrogate_key}", "updates.*")
+
+    # Define a window specification to partition by null ID values
+    w = Window.partitionBy(df_updates[surrogate_key].isNull()).orderBy(order_keys_by)
+
+    # Generate an increasing ID
+    incremental_id = row_number().over(w) + max_id
+
+    # Replace null values in the ID column with generated IDs
+    df_updates = df_updates.withColumn(surrogate_key, coalesce(surrogate_key, incremental_id))
+
+    # Merge updates into destination using surrogate key
+    table_destination = DeltaTable.forName(spark, destination)
+    table_destination.alias("destination") \
+        .merge(df_updates.alias("updates"),f"updates.{surrogate_key} = destination.{surrogate_key}") \
+        .whenMatchedUpdateAll() \
+        .whenNotMatchedInsertAll() \
+        .execute()
+    return_message = f"Updated data from '{source_view}' into Delta table: '{destination}'"
+    return(return_message)
