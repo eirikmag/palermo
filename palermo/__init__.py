@@ -1,7 +1,7 @@
 from delta.tables import *
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, row_number, coalesce
 from pyspark.sql.utils import AnalysisException
-
+from pyspark.sql.window import Window
 
 
 def pal_mergo (
@@ -181,7 +181,7 @@ def dimwit (
         source_view: str, 
         unique_keys: str, 
         order_keys_by:str, 
-        surrogate_key: str, 
+        surrogate_key_name: str, 
         destination: str, 
         location: str
 ) -> None:
@@ -192,7 +192,7 @@ def dimwit (
         source_view (str): The name of the table name to write to.
         unique_keys (str): The name of columns in source_view that should identify uniqueness.
         order_keys_by (str): The name of a column to sort to get to produce row_numbers.
-        surrogate_key: (str): The name of the surrogate key to generate
+        surrogate_key_name: (str): The name of the surrogate key to generate
         destination: (str): The destination/catalog+table name to store the table as. eg. gold.dim_potato
         location: (str): The "physical storage location" to store the table.
 
@@ -207,7 +207,7 @@ def dimwit (
     col_names, data_types = table_description.selectExpr("collect_list(col_name)", "collect_list(data_type)").first()
 
     try:
-        max_id = spark.sql(f"SELECT MAX({surrogate_key}) FROM {destination}").first()[0]
+        max_id = spark.sql(f"SELECT MAX({surrogate_key_name}) FROM {destination}").first()[0]
         if max_id is None:
             max_id = 0
     # If there is no ID. There is no supported table, so we generate one dynamically based on input arguments.
@@ -218,7 +218,7 @@ def dimwit (
         columns = " ,".join([f"{name} {data_type}" for name, data_type in zip(col_names, data_types)])
         initial_table_definition = f'''
           CREATE OR REPLACE TABLE {destination} 
-          ({surrogate_key} BIGINT not null, {columns})
+          ({surrogate_key_name} BIGINT not null, {columns})
           USING DELTA
           LOCATION "{location}"
           '''
@@ -233,6 +233,12 @@ def dimwit (
     # Read data from source view and filter by unique key
     df_updates = spark.read.table(source_view).filter(filter_condition)
 
+  # Check for duplicates in the filtered DataFrame
+    duplicates = df_updates.groupby(unique_cols).count().filter("count > 1")
+    if duplicates.count() > 0:
+        return f"ERROR: Duplicates found in {source_view} on columns {unique_cols}"
+
+
     # Read data from destination table
     df_destination = spark.read.table(destination)
 
@@ -241,21 +247,21 @@ def dimwit (
         other=df_updates.alias("updates"),
         on=[col("destination." + col_name) == col("updates." + col_name) for col_name in unique_cols],
         how='full_outer'
-    ).selectExpr(f"destination.{surrogate_key} as {surrogate_key}", "updates.*")
+    ).selectExpr(f"destination.{surrogate_key_name} as {surrogate_key_name}", "updates.*")
 
     # Define a window specification to partition by null ID values
-    w = Window.partitionBy(df_updates[surrogate_key].isNull()).orderBy(order_keys_by)
+    w = Window.partitionBy(df_updates[surrogate_key_name].isNull()).orderBy(order_keys_by)
 
     # Generate an increasing ID
-    incremental_id = row_number().over(w) + max_id
+    incremental_id = rank().over(w) + max_id
 
     # Replace null values in the ID column with generated IDs
-    df_updates = df_updates.withColumn(surrogate_key, coalesce(surrogate_key, incremental_id))
+    df_updates = df_updates.withColumn(surrogate_key_name, coalesce(surrogate_key_name, incremental_id))
 
     # Merge updates into destination using surrogate key
     table_destination = DeltaTable.forName(spark, destination)
     table_destination.alias("destination") \
-        .merge(df_updates.alias("updates"),f"updates.{surrogate_key} = destination.{surrogate_key}") \
+        .merge(df_updates.alias("updates"),f"updates.{surrogate_key_name} = destination.{surrogate_key_name}") \
         .whenMatchedUpdateAll() \
         .whenNotMatchedInsertAll() \
         .execute()
