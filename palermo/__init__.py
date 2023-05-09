@@ -183,7 +183,8 @@ def dimwit (
         order_keys_by:str, 
         surrogate_key_name: str, 
         destination: str, 
-        location: str
+        location: str,
+        test_for_duplicates: bool = False
 ) -> None:
     """
     dimwit writes or updates a Delta table from a registered view and ensures persistance of surrogate keys over time.
@@ -233,10 +234,11 @@ def dimwit (
     # Read data from source view and filter by unique key
     df_updates = spark.read.table(source_view).filter(filter_condition)
 
-  # Check for duplicates in the filtered DataFrame
-    duplicates = df_updates.groupby(unique_cols).count().filter("count > 1")
-    if duplicates.count() > 0:
-        return f"ERROR: Duplicates found in {source_view} on columns {unique_cols}"
+  # Check for duplicates in the filtered DataFrame if test_for_duplicates = True
+    if test_for_duplicates:
+        duplicates = df_updates.groupby(unique_cols).count().filter("count > 1")
+        if duplicates.count() > 0:
+            return f"ERROR: Duplicates found in {source_view} on columns {unique_cols}"
 
 
     # Read data from destination table
@@ -253,7 +255,7 @@ def dimwit (
     w = Window.partitionBy(df_updates[surrogate_key_name].isNull()).orderBy(order_keys_by)
 
     # Generate an increasing ID
-    incremental_id = rank().over(w) + max_id
+    incremental_id = row_number().over(w) + max_id
 
     # Replace null values in the ID column with generated IDs
     df_updates = df_updates.withColumn(surrogate_key_name, coalesce(surrogate_key_name, incremental_id))

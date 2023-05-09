@@ -2,6 +2,7 @@
 
 Palermo provides helper methods meant for use in a development framework of Delta lakehouses in Azure Synapse Notebooks. The functions are built with as few dependencies as possible to allow for copy/paste-portability.
 
+
 ![palermo](https://github.com/eirikmag/palermo/blob/main/images/palermo.jfif)
 
 
@@ -44,18 +45,18 @@ In a notebook context, a typical use case would involve you defining a Spark vie
 ```sql
 %sql
 
-CREATE OR REPLACE VIEW silver.fact_transaction_pm
+CREATE OR REPLACE VIEW silver.fact_transaction
 AS 
 
 SELECT
-    t.transactionid
-    ,t.transactiondate
-    ,t.transactiontype
-    ,t.transactionamount
-    ,t.modifieddate
-    ,p.regionid
-FROM bronze.alltransactions t
-LEFT JOIN bronze.person p ON t.personid = p.personid
+    t.transaction_id
+    ,t.transaction_date
+    ,t.transaction_type
+    ,t.transaction_amount
+    ,t.modified_date
+    ,p.region_id
+FROM bronze.all_transactions t
+LEFT JOIN bronze.person p ON t.person_id = p.person_id
 ```
 
 In the next cell you should trigger the function:
@@ -63,9 +64,9 @@ In the next cell you should trigger the function:
 %pyspark 
 
 pal_mergo(
-    source_view = "silver.fact_transaction_pm",
-    primarykey_columns =  "transactionid",
-    watermark_column = "modifieddate",
+    source_view = "silver.fact_transaction",
+    primarykey_columns =  "transaction_id",
+    watermark_column = "modified_date",
     destination_table = "gold.fact_transaction",
     merge_schema = False
     )
@@ -155,3 +156,67 @@ hoover(
 ```
 
 Will vacuum all Delta tables in the "my_database" Spark database with a retention period of 168 hours. If a table is not a Delta table, it will be skipped and a message will be printed to the console. If the retention period provided is less than 168 hours, a ValueError will be raised.
+
+
+
+## Dimwit
+The `dimwit` function writes or updates a Delta table from a registered view and ensures persistence of surrogate keys over time. This function is intended to be used as part of a data pipeline in a Spark environment. It takes in several inputs and produces a Delta table as its output.
+
+### Function parameters:
+* source_view: a string representing the name of the Spark view containing the data to be written to the Delta table.
+* unique_keys: a string representing the unique key column(s) to be used to filter and match data in both the source and destination tables, e.g. 'employee_id, date'.
+* order_keys_by: a string representing the column to be used to sort and generate row numbers, e.g. 'date'.
+* surrogate_key_name: a string representing the name of the surrogate key to be generated for the Delta table.
+* destination: a string representing the destination/catalog+table name to store the Delta table, e.g. 'gold.dim_potato'.
+* location: a string representing the physical storage location to store the Delta table.
+* test_for_duplicates: a boolean indicating whether the function should test for duplicates in the filtered DataFrame before writing/updating the Delta table. Default is False.
+
+### Function behavior:
+The function first extracts the column names and data types from the Delta table description of the input view. If the destination Delta table already exists, it reads the maximum surrogate key from the destination and sets incremental_id to begin building keys on. Otherwise, it generates the Delta table dynamically based on input arguments.
+
+Next, it creates a filter condition that excludes rows where any unique key is null, reads data from the source view, and filters by the unique key. If test_for_duplicates is set to True, it checks for duplicates in the filtered DataFrame.
+
+The function then reads data from the destination Delta table and joins it with the filtered updates table on the unique key. It generates an increasing surrogate key, replaces null values in the surrogate key column with generated IDs, and merges the updates into the destination Delta table using the surrogate key. Finally, it returns a string indicating that the data from the source view has been updated into the Delta table.
+
+### Example of use:
+In a notebook context, a typical use case would involve you defining a Spark view in one cell:
+
+
+```sql
+%sql
+
+CREATE OR REPLACE VIEW silver.dim_product
+AS 
+
+SELECT
+    p.product_id
+    ,p.product_name
+    ,pg.product_category_id
+    ,pg.product_category_name
+    ,p.region_id
+    ,p.modified_date
+FROM bronze.product p
+JOIN bronze.product_group pg
+
+```
+Let's assume the aforementioned views rows are unique by product_id and region_id
+
+In the next cell you should trigger the function like this:
+```python
+%pyspark 
+
+dimwit(
+    source_view = 'silver.dim_product', 
+    unique_keys = 'product_id, region_id',
+    order_keys_by = 'product_id', 
+    surrogate_key_name = 'product_sk',
+    destination = 'gold.dim_product',
+    location = 'abfss://gold@altrohotboys.dfs.core.windows.net/dim/dim_product/',
+    test_for_duplicates = True
+    )
+```
+
+This will produce a table defined identical to silver.dim_product, but with a column named `product_sk` that is unique.
+
+### Caveats:
+If the `test_for_duplicates` argument is set to False, the function will produce a table regardless if the defined `unique_keys` are actually unique or not. If you are unsure if your columns actually produce uniqueness you could test producing the table with the `test_for_duplicates` parameter set to `True` first and set it to `False` if you find the test to costly in a production setting.
