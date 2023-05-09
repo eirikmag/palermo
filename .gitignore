@@ -1,5 +1,6 @@
 dist/
 build/
+.vscode/
 palermo.egg-info
 setup.py
 dependency_links.txt
@@ -7,3 +8,4 @@ PKG-INFO
 requires.txt
 SOURCES.txt
 top_level.txt
+.vscode
