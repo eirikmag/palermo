@@ -198,7 +198,7 @@ def dimwit (
         location: (str): The "physical storage location" to store the table.
 
     Returns:
-        None: This function returns None.
+        None.
     """
 
     # Get column names and data types from delta table description of input view
