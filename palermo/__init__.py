@@ -1,5 +1,5 @@
 from delta.tables import *
-from pyspark.sql.functions import col, row_number, coalesce
+from pyspark.sql.functions import col, row_number, coalesce, lit
 from pyspark.sql.utils import AnalysisException
 from pyspark.sql.window import Window
 
@@ -269,3 +269,73 @@ def dimwit (
         .execute()
     return_message = f"Updated data from '{source_view}' into Delta table: '{destination}'"
     return(return_message)
+
+
+def cata_logger(catalog: str) -> None:
+    """
+    Retrieves catalog information for all delta tables in a Spark database using the DESCRIBE HISTORY command.
+
+    Parameters:
+        catalog (str): The name of the Spark catalog to list data from.
+
+    Raises:
+        None.
+
+    Returns:
+        DataFrame: A DataFrame containing catalog information for all delta tables in the specified catalog.
+                   The DataFrame includes the following columns:
+                   - database: The name of the database.
+                   - tableName: The name of the table.
+                   - Other columns: Additional columns providing detailed operation metrics for each table,
+                     such as the number of target rows copied, deleted, inserted, updated, etc.
+                     See the code comments for a complete list of the additional columns.
+
+    This function iterates through all tables in the specified Spark catalog and retrieves their history information
+    using the `describe history` command. Delta tables are considered, while views are excluded from the iteration.
+
+    The resulting DataFrame includes the catalog, database, and tableName columns as the first three columns,
+    followed by additional columns representing operation metrics for each table. The additional columns provide
+    detailed information about the vacuum operations performed on each table, such as the number of rows copied,
+    deleted, inserted, updated, execution time, scan time, etc. These operation metrics can be useful for monitoring
+    and analyzing the performance of the vacuum operations.
+
+    Note: This function assumes that the tables in the catalog are Delta tables and have a history that can be described.
+    If non-Delta tables are present or if a table's history is unavailable, an error may occur.
+    """
+    result_df = None
+
+    # List all tables in the database.
+    tables = spark.catalog.listTables(catalog)
+
+    # Iterate through the tables and append all to full dataframe
+    for table in tables:
+        if table.tableType != "VIEW": # Exclude views from the list to iterate
+            df = spark.sql(f"describe history {table.database}.{table.name}")
+            df = df.withColumn("database", lit(table.database))
+            df = df.withColumn("tableName", lit(table.name))
+
+            if result_df is None:
+                result_df = df
+            else:
+                result_df = result_df.unionAll(df)
+
+    # Reorder columns to place catalog, database, and tableName at the beginning
+    result_df = result_df.select("database", "tableName", *result_df.columns)
+
+    # Add additional columns to the result_df DataFrame
+    result_df = result_df.withColumn("numTargetRowsCopied", col("operationMetrics.numTargetRowsCopied"))
+    result_df = result_df.withColumn("numTargetRowsDeleted", col("operationMetrics.numTargetRowsDeleted"))
+    result_df = result_df.withColumn("numTargetFilesAdded", col("operationMetrics.numTargetFilesAdded"))
+    result_df = result_df.withColumn("executionTimeMs", col("operationMetrics.executionTimeMs"))
+    result_df = result_df.withColumn("numTargetRowsInserted", col("operationMetrics.numTargetRowsInserted"))
+    result_df = result_df.withColumn("unmodifiedRewriteTimeMs", col("operationMetrics.unmodifiedRewriteTimeMs"))
+    result_df = result_df.withColumn("scanTimeMs", col("operationMetrics.scanTimeMs"))
+    result_df = result_df.withColumn("numTargetRowsUpdated", col("operationMetrics.numTargetRowsUpdated"))
+    result_df = result_df.withColumn("numOutputRows", col("operationMetrics.numOutputRows"))
+    result_df = result_df.withColumn("numTargetChangeFilesAdded", col("operationMetrics.numTargetChangeFilesAdded"))
+    result_df = result_df.withColumn("numSourceRows", col("operationMetrics.numSourceRows"))
+    result_df = result_df.withColumn("numTargetFilesRemoved", col("operationMetrics.numTargetFilesRemoved"))
+    result_df = result_df.withColumn("rewriteTimeMs", col("operationMetrics.rewriteTimeMs"))
+    # Add more additional columns as needed
+
+    return result_df

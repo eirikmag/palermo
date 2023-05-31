@@ -220,3 +220,34 @@ This will produce a table defined identical to silver.dim_product, but with a co
 
 ### Caveats:
 If the `test_for_duplicates` argument is set to False, the function will produce a table regardless if the defined `unique_keys` are actually unique or not. If you are unsure if your columns actually produce uniqueness you could test producing the table with the `test_for_duplicates` parameter set to `True` first and set it to `False` if you find the test to costly in a production setting.
+
+
+
+## Cata_logger
+The cata_logger function retrieves catalog information for all Delta tables in a Spark database using the DESCRIBE HISTORY command. It returns a DataFrame with historical information for each table from the delta transactional log, including operation metrics such as the number of target rows copied, deleted, inserted, updated, execution time, scan time, etc.
+
+### Function parameters:
+catalog (str): The name of the Spark catalog to list data from.
+
+### Function behavior:
+The function iterates through all tables in the specified Spark catalog and retrieves their history information using the DESCRIBE HISTORY command. Only Delta tables are considered, while views and non-Delta tables are excluded from the iteration.
+
+The resulting DataFrame includes the following columns:
+
+database: The name of the database.
+tableName: The name of the table.
+Additional columns: Additional columns providing detailed operation metrics for each table, such as the number of target rows copied, deleted, inserted, updated, etc.
+Note: This function assumes that the tables in the catalog are Delta tables and have a history that can be described. If non-Delta tables are present or if a table's history is unavailable, the function may break.
+
+### Example of use:
+```python
+### Call the cata_logger function
+df = cata_logger("your_catalog_name")
+
+# Show the resulting DataFrame
+df.show()
+```
+
+This will display all historical information for all Delta tables in the specified catalog.
+
+Note: Make sure to replace "your_catalog_name" with the actual name of your Spark catalog.
